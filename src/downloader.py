@@ -1,19 +1,26 @@
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 
-# --- built in ----
+# --- built-ins ---
 import os
+import copy
+import csv
+import time
+import datetime
 
+if __name__ == '__main__':
+    load_dotenv()
 USER_NAME = os.environ.get('NAME') or 'halo1' 
 OUTPUT_FILE = os.environ.get('OUTPUT_FILE') or 'typeracer_data.csv'
 LOAD_FROM_FILE = os.environ.get('LOAD_FROM_FILE') or 'true'
+SAVE_DATA_TO_FILE = os.environ.get('SAVE_DATA') or 'true'
 
 def get_page(user_name,start_date='',universe='',cursor=None):
     number_per_page = 100
     base_url = "https://data.typeracer.com/pit/race_history"
     url = f"{base_url}?user={user_name}&n={number_per_page}&startDate={start_date}&universe={universe}" if cursor is None else f"{base_url}{cursor}"
     page = requests.get(url)
-
     soup = BeautifulSoup(page.content, "html.parser")
     rows = soup.find_all(class_="Scores__Table__Row")
     next_page = soup.find("a",string="\n          load older results »\n        ")
@@ -35,51 +42,92 @@ def get_children_tags(parent):
     return [x for x in parent.contents if not x == '\n']
 
 def get_soup(user_name):
+    start_time = time.time()
+    batch_time = time.time()
     cursor = None
     first_run = True
     data = []
-    while first_run:#not cursor is None or first_run:
+    while not cursor is None or first_run:
         first_run = False
-        print(f'fetching data {len(data)} at cursor {cursor}')
-        rows, cursor = get_page(user_name)
+        rows, cursor = get_page(user_name,cursor=cursor)
         data.extend(rows)
+        print(f'fetched data, batch took {round(time.time()-batch_time,1)}s. Currently at {len(data)} records in {round(time.time()-start_time,1)}s')
+        batch_time = time.time()
+        time.sleep(5)
     return data
 
 def clean_up_soup(data):
     # Raw data looks like:
-    # race_id_link,wpm,accuracy,points,placement,date
+    #   race_id_link,wpm,accuracy,points,placement,date
 
     no_white = [[item.strip() for item in row] for row in data]
     clean_data = []
     for row in no_white:
         run_id = int(row[0].split('|')[-1])
-        date = row[5]
-        if date in ['today']:
-            pass #TODO
         clean_row = (run_id,
             row[0],
             row[1].replace(' WPM',''),
             float(row[2].replace('%','')),
-            int(row[3]),
+            0 if row[3] == 'N/A' else int(row[3]),
             row[4],
-            date)
+            get_standard_date(row[5]))
         clean_data.append(clean_row)
+    clean_data = sorted(clean_data,key= lambda x: x[0])
     return clean_data
 
-def load_data_from_file():
-    pass
+def get_standard_date(input_date):
+    if input_date == 'today':
+        date = datetime.datetime.utcnow()
+        return date.strftime('%Y-%m-%d')
+    month,day,year = input_date.split(' ')
+    year = int(year)
+    day = int(day.replace(',',''))
+    temp_month = datetime.datetime.strptime(month[:3],"%b")
+    month = temp_month.month
+    date = datetime.datetime(year, month, day)
+    return date.strftime('%Y-%m-%d')
 
-get_soup('halo1')
 
+def load_data_from_file(output_location):
+    data = None
+    with open(output_location,'r') as read_file:
+        csv_reader = csv.reader(read_file)
+        data = [x for x in csv_reader][1:]# peal off header
+    return data
 
-def main():
-    has_file = os.path.isfile(OUTPUT_FILE)
+def load_data_from_site(user):
+    raw_data = get_soup(user)
+    data = clean_up_soup(raw_data)
+    return data
+
+def save_to_file(DATA,output_location):
+    header = ("id","info_link","WPM","accuracy","points","placement","date")
+    data = copy.deepcopy(DATA)
+    data.insert(0,header)
+    with open(output_location,"w+", newline='') as output_file:
+        csv_writer = csv.writer(output_file)
+        csv_writer.writerows(data)
+
+def main(
+    user=USER_NAME,
+    output_file=OUTPUT_FILE,
+    load_from_file=LOAD_FROM_FILE,
+    save_data_to_file=SAVE_DATA_TO_FILE,
+):
+    has_file = os.path.isfile(output_file)
     working_dataset = []
 
-    if LOAD_FROM_FILE and has_file:
-        working_dataset = load_data_from_file()
+    if load_from_file and has_file and not load_from_file.lower() in ['false','f']:
+        print("reading from file")
+        working_dataset = load_data_from_file(output_file)
+        #TODO - perform upsert here
     else:
-        pass
+        print("reading from site")
+        working_dataset = load_data_from_site(user)
+        if not save_data_to_file.lower() in ['false','f']:
+            save_to_file(working_dataset,output_file)
+    
+    return working_dataset
 
 if __name__ == '__main__':
     main()
