@@ -13,8 +13,8 @@ When you get the hang of it look at visualizer.py for other types of graphes tha
 
 ## Examples
 
-![month line with CI](https://github.com/1mozolacal/Type_Racer_Analyzer/media/monthly.png?raw=true)
-![WPM and Accuracy vs ID](https://github.com/1mozolacal/Type_Racer_Analyzer/media/ful_id.png?raw=true)
+![month line with CI](https://github.com/1mozolacal/Type_Racer_Analyzer/blob/main/media/monthly.png?raw=true)
+![WPM and Accuracy vs ID](https://github.com/1mozolacal/Type_Racer_Analyzer/blob/main/media/ful_id.png?raw=true)
 
 ## Enhancements
 Some possible enhancements I might add if the demand is there. Open an issue to indicate interest.
