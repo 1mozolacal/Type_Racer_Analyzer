@@ -11,7 +11,7 @@ import datetime
 
 if __name__ == '__main__':
     load_dotenv()
-USER_NAME = os.environ.get('NAME') or 'halo1' 
+USER_NAME = os.environ.get('NAME')
 OUTPUT_FILE = os.environ.get('OUTPUT_FILE') or 'typeracer_data.csv'
 LOAD_FROM_FILE = os.environ.get('LOAD_FROM_FILE') or 'true'
 SAVE_DATA_TO_FILE = os.environ.get('SAVE_DATA') or 'true'
@@ -112,9 +112,17 @@ def main(
     user=USER_NAME,
     output_file=OUTPUT_FILE,
     load_from_file=LOAD_FROM_FILE,
-    save_data_to_file=SAVE_DATA_TO_FILE,
-):
+    save_data_to_file=SAVE_DATA_TO_FILE):
     has_file = os.path.isfile(output_file)
+    if user is None:
+        print("Warning missing username, this is required if you are pulling data")
+        if not(has_file and not save_data_to_file is None 
+            and not save_data_to_file.lower() in ['false','f']):
+            exit()
+    output_file = output_file or 'typeracer_data.csv'
+    load_from_file = load_from_file or 'true'
+    save_data_to_file = save_data_to_file or 'true'
+    
     working_dataset = []
 
     if load_from_file and has_file and not load_from_file.lower() in ['false','f']:
